@@ -1,0 +1,54 @@
+---
+- name: Playbook to pull job templates information from Tower
+  hosts: localhost
+  gather_facts: no
+  tasks:
+
+    - name: Make Api call to tower to pull job template data
+      uri:
+        url: tower_api_url
+        user:  #  can be encrypted
+        password:  # may be encrypted, or an API token can be used
+        method: GET
+        return_content: yes
+        force_basic_auth: yes
+        body_format: json
+      register: returned_data
+
+
+    - name: delete job_templates_report.csv file if it already exists
+      file:
+         path: /tmp/job_templates_report.csv
+         state: absent
+      ignore_errors: yes
+
+
+    - name: create a CSV file and title the columns 
+      lineinfile:
+        path: /tmp/job_templates_report.csv 
+        line: "Organization,Project,Job Template,Job Template ID,Playbook,Created By,Created On,Modified By,Modified On,Last Job Date,Last Job Status,Inventory,Inventory Host Count,Inventory source"
+        insertafter: EOF
+        create: yes
+
+
+    - name: generate csv file
+      lineinfile:
+        path: /tmp/job_templates_report.csv # data to be uploaded to excel or entered into a database
+        line: "{{item.2}},{{item.1}},{{item.2}},{{item.3}},{{item.4}},{{item.5}},{{item.6}},{{item.7}},{{item.8}},{{item.9}},{{item.10}},{{item.11}},{{item.12}},{{item.13}}" 
+        insertafter: EOF
+      with_together:
+
+         - "{{returned_data.json.results | map(attribute='summary_fields.organization.name') | list  }}"
+         - "{{returned_data.json.results | map(attribute='summary_fields.project.name') | list  }}"
+         - "{{returned_data.json.results | map(attribute='name') | list}}"
+         - "{{returned_data.json.results | map(attribute='id') | list}}"
+         - "{{returned_data.json.results | map(attribute='playbook') | list}}"
+         - "{{returned_data.json.results | map(attribute='summary_fields.created_by.username') | list  }}"
+         - "{{returned_data.json.results | map(attribute='created') | list}}"
+         - "{{returned_data.json.results | map(attribute='summary_fields.modified_by.username') | list  }}"
+         - "{{returned_data.json.results | map(attribute='modified') | list}}"
+         - "{{returned_data.json.results | map(attribute='last_job_run') | list}}"
+         - "{{returned_data.json.results | map(attribute='status') | list}}"
+         - "{{returned_data.json.results | map(attribute='summary_fields.inventory.name') | list  }}"
+         - "{{returned_data.json.results | map(attribute='summary_fields.inventory.total_hosts') | list  }}"
+         - "{{returned_data.json.results | map(attribute='summary_fields.inventory.has_inventory_sources') | list  }}"
